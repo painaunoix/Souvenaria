@@ -1,74 +1,149 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, SafeAreaView } from 'react-native';
 import { useRouter, usePathname, Slot } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons'; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function Layout() {
   const [isMenuVisible, setMenuVisible] = useState(false);
-  const slideAnim = useRef(new Animated.Value(-300)).current; // Utilise useRef pour une valeur persistante
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-300)).current;
   const router = useRouter();
-  const pathname = usePathname(); // Récupère la route actuelle
+  const pathname = usePathname();
 
-  // Fonction pour ouvrir/fermer le menu
+  useEffect(() => {
+    const checkUserSession = async () => {
+      const session = await AsyncStorage.getItem('supabase.session');
+      if (session) {
+        setIsLoggedIn(true);
+      } else {
+        setIsLoggedIn(false);
+      }
+    };
+    router.replace('/register');
+    checkUserSession();
+  }, []);
+
+  const logout = async () => {
+    await AsyncStorage.clear();
+    setIsLoggedIn(false);
+    closeMenu();
+    router.push('/register');
+  };
+
   const toggleMenu = () => {
-    setMenuVisible(!isMenuVisible);
+    if (isMenuVisible) {
+      closeMenu();
+    } else {
+      openMenu();
+    }
+    slideAnim.addListener(({ value }) => {
+      console.log('Position actuelle du menu :', value);
+    });
+  };
+
+  const openMenu = () => {
+    setMenuVisible(true);
     Animated.timing(slideAnim, {
-      toValue: isMenuVisible ? -300 : 0, // Slide in ou out
+      toValue: 0,
       duration: 300,
+      easing: Easing.ease,
       useNativeDriver: false,
     }).start();
   };
 
-  // Fonction pour styliser l'élément de menu actif
+  const closeMenu = () => {
+    Animated.timing(slideAnim, {
+      toValue: -300,
+      duration: 300,
+      easing: Easing.ease,
+      useNativeDriver: false,
+    }).start(() => {
+      setMenuVisible(false);
+    });
+  };
+
   const getMenuItemStyle = (route: string) => {
     return pathname === route
       ? [styles.menuItem, styles.activeMenuItem]
       : styles.menuItem;
   };
 
+  const pagesWithMenu = [
+    '/', 
+    '/addMemory', 
+    '/calendrier', 
+    '/galerie', 
+    '/favoris', 
+    '/recherche', 
+    '/statistiques', 
+    '/parametres',
+    '/parametres/familles',
+    '/parametres/profils',
+    '/parametres/demandes',
+  ];
+
+  const shouldShowMenu = pagesWithMenu.includes(pathname);
+  const isSubPage = pathname.includes('/parametres/familles') || pathname.includes('/parametres/profils');
+  const isDemandesPage = pathname.includes('/parametres/demandes');
+
   return (
-    <View style={{ flex: 1 }}>
-      {/* Barre avec le bouton hamburger */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={toggleMenu} style={styles.menuButton}>
-          <Ionicons name="menu" size={30} color="black" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mon Application</Text>
-      </View>
+    <SafeAreaView style={{ flex: 1 }}>
+      {shouldShowMenu && (
+        <View style={styles.header}>
+          {isSubPage || isDemandesPage ? (
+            <TouchableOpacity 
+              onPress={() => isDemandesPage ? router.push('/parametres/familles') : router.push('/parametres')} 
+              style={styles.backButton}
+            >
+              <Ionicons name="arrow-back" size={30} color="black" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={toggleMenu} style={styles.menuButton}>
+              <Ionicons name="menu" size={30} color="black" />
+            </TouchableOpacity>
+          )}
+          <Text style={styles.headerTitle}>Souvenaria</Text>
+        </View>
+      )}
 
-      {/* Contenu principal dynamique */}
       <View style={styles.content}>
-        <Slot /> {/* Ceci chargera dynamiquement le contenu de la route active */}
+        <Slot />
       </View>
 
-      {/* Menu latéral */}
-      <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
-        <TouchableOpacity onPress={() => { router.push('/'); toggleMenu(); }}>
-          <Text style={getMenuItemStyle('/')}>Accueil 🏠</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => { router.push('/addMemory'); toggleMenu(); }}>
-          <Text style={getMenuItemStyle('/addMemory')}>Ajouter un souvenir 📝</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => { router.push('/chronologie'); toggleMenu(); }}>
-          <Text style={getMenuItemStyle('/chronologie')}>Chronologie 📅</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => { router.push('/galerie'); toggleMenu(); }}>
-          <Text style={getMenuItemStyle('/galerie')}>Galerie 🖼️</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => { router.push('/favoris'); toggleMenu(); }}>
-          <Text style={getMenuItemStyle('/favoris')}>Favoris ⭐</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => { router.push('/recherche'); toggleMenu(); }}>
-          <Text style={getMenuItemStyle('/recherche')}>Recherche 🔎</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => { router.push('/statistiques'); toggleMenu(); }}>
-          <Text style={getMenuItemStyle('/statistiques')}>Statistiques 📊</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => { router.push('/parametres'); toggleMenu(); }}>
-          <Text style={getMenuItemStyle('/parametres')}>Parametres ⚙️</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    </View>
+      {isLoggedIn && shouldShowMenu && (
+        <Animated.View style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}>
+          <TouchableOpacity onPress={() => { router.push('/'); closeMenu(); }}>
+            <Text style={getMenuItemStyle('/')}>Accueil 🏠</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { router.push('/addMemory'); closeMenu(); }}>
+            <Text style={getMenuItemStyle('/addMemory')}>Ajouter un souvenir 📝</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { router.push('/calendrier'); closeMenu(); }}>
+            <Text style={getMenuItemStyle('/calendrier')}>Calendrier 📅</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { router.push('/galerie'); closeMenu(); }}>
+            <Text style={getMenuItemStyle('/galerie')}>Galerie 🖼️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { router.push('/favoris'); closeMenu(); }}>
+            <Text style={getMenuItemStyle('/favoris')}>Favoris ⭐</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { router.push('/recherche'); closeMenu(); }}>
+            <Text style={getMenuItemStyle('/recherche')}>Recherche 🔎</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { router.push('/statistiques'); closeMenu(); }}>
+            <Text style={getMenuItemStyle('/statistiques')}>Statistiques 📊</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { router.push('/parametres'); closeMenu(); }}>
+            <Text style={getMenuItemStyle('/parametres')}>Paramètres ⚙️</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={logout}>
+            <Text style={[styles.menuItem, { color: 'red' }]}>Déconnexion 🚪</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+    </SafeAreaView>
   );
 }
 
@@ -79,8 +154,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 15,
+    paddingTop: 20, // Ajouter un paddingTop pour éloigner le contenu de l'encoche
   },
   menuButton: {
+    marginRight: 15,
+  },
+  backButton: {
     marginRight: 15,
   },
   headerTitle: {
@@ -94,7 +173,7 @@ const styles = StyleSheet.create({
   },
   drawer: {
     position: 'absolute',
-    top: 60,
+    top: 80, // Abaisser la position du menu pour éviter la superposition avec l'encoche
     bottom: 0,
     width: 300,
     backgroundColor: '#ffffff',
@@ -113,7 +192,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#ddd',
   },
   activeMenuItem: {
-    fontWeight: 'bold', // Exemple de style pour l'élément actif
-    backgroundColor: '#e0e0e0', // Ajouter un fond différent
+    fontWeight: 'bold',
+    backgroundColor: '#e0e0e0',
   },
 });
