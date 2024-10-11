@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, StyleSheet, Dimensions } from 'react-native';
 import { supabase } from '../../supabaseClient';
 import { useRouter } from 'expo-router';
 
@@ -16,10 +16,12 @@ export default function DemandesScreen() {
   const [requests, setRequests] = useState<Request[]>([]);
   const router = useRouter();
 
+  // Obtenir les dimensions de l'écran
+  const { width, height } = Dimensions.get('window');
+
   // Fonction pour récupérer les demandes et les usernames
   useEffect(() => {
     const fetchRequests = async () => {
-      // Récupérer les demandes
       const { data: requestsData, error: requestsError } = await supabase
         .from('family_requests')
         .select('*')
@@ -36,7 +38,6 @@ export default function DemandesScreen() {
         return;
       }
 
-      // Récupérer les usernames pour tous les user_ids
       const userIds = requestsData.map(request => request.user_id);
       const { data: profilesData, error: profilesError } = await supabase
         .from('user_profiles')
@@ -49,7 +50,6 @@ export default function DemandesScreen() {
         return;
       }
 
-      // Combiner les demandes avec les usernames
       const requestsWithUsernames = requestsData.map(request => {
         const userProfile = profilesData?.find(profile => profile.id === request.user_id);
         return {
@@ -64,7 +64,6 @@ export default function DemandesScreen() {
     fetchRequests();
   }, []);
 
-  // Accepter une demande et ajouter l'utilisateur à la famille
   const handleAccept = async (request_id: string, user_id: string, family_id: string) => {
     try {
       const { error: updateError } = await supabase
@@ -95,7 +94,6 @@ export default function DemandesScreen() {
     }
   };
 
-  // Refuser une demande
   const handleReject = async (request_id: string) => {
     try {
       const { error } = await supabase
@@ -114,7 +112,7 @@ export default function DemandesScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { width, height }]}>
       <Text style={styles.title}>Demandes d'adhésion</Text>
       {requests.length > 0 ? (
         requests.map(request => (
@@ -138,8 +136,10 @@ export default function DemandesScreen() {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1, // Assure que la vue occupe tout l'espace disponible
+    justifyContent: 'flex-start',
+    backgroundColor: '#f5f5f5', // Fond gris qui se scale selon l'écran
     padding: 20,
-    backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 32,

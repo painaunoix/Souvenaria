@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert, FlatList, Modal, TouchableOpacity } from 'react-native';
-import { supabase } from '../supabaseClient'; // Assure-toi que ce chemin est correct
-import dayjs from 'dayjs'; // Pour formater les dates
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Pour gérer les sessions
+import { View, Text, TextInput, Button, Alert, FlatList, Modal, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { supabase } from '../supabaseClient';
+import dayjs from 'dayjs';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Event = {
   event_id: string;
@@ -17,15 +17,17 @@ export default function EventListScreen() {
   const [eventDate, setEventDate] = useState<string>('');
   const [eventType, setEventType] = useState<string>('');
   const [familyId, setFamilyId] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null); // Ajouter userId
+  const [userId, setUserId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
 
-  // Obtenir l'utilisateur connecté et sa famille associée
+  // Récupérer la taille de l'écran
+  const screenWidth = Dimensions.get('window').width;
+
   useEffect(() => {
     const fetchUserFamily = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        setUserId(session.user.id); // Stocker l'ID utilisateur
+        setUserId(session.user.id);
         const { data: userFamilyData, error } = await supabase
           .from('user_families')
           .select('family_id')
@@ -44,7 +46,6 @@ export default function EventListScreen() {
     fetchUserFamily();
   }, []);
 
-  // Fonction pour récupérer les événements
   const fetchEvents = async (familyId: string) => {
     const { data, error } = await supabase
       .from('events')
@@ -61,46 +62,43 @@ export default function EventListScreen() {
     }
   };
 
-  // Fonction pour ajouter un événement
   const handleAddEvent = async () => {
-    if (!userId) {
-      Alert.alert('Erreur', 'Impossible de récupérer l\'ID utilisateur.');
-      return;
-    }
-
-    if (eventName.trim() === '' || eventDate.trim() === '' || eventType.trim() === '') {
+    if (!familyId || eventName.trim() === '' || eventDate.trim() === '' || eventType.trim() === '') {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs.');
       return;
     }
-
+  
+    // Utilisation de dayjs pour formater correctement la date avant l'insertion
+    const formattedDate = dayjs(eventDate).format('YYYY-MM-DD');
+  
     try {
       const { data, error } = await supabase
         .from('events')
         .insert([{
           family_id: familyId,
-          user_id: userId, // Inclure l'ID utilisateur lors de l'insertion
           event_name: eventName,
-          event_date: eventDate,
+          event_date: formattedDate,  // Format correct de la date
           event_type: eventType,
         }]);
-
+  
       if (error) {
-        throw error;
+        console.error('Erreur Supabase:', error);
+        throw new Error(error.message);
       }
-
+  
       Alert.alert('Succès', 'Événement ajouté avec succès!');
       setEventName('');
       setEventDate('');
       setEventType('');
       setModalVisible(false);
       fetchEvents(familyId!);
+  
     } catch (error) {
-      Alert.alert('Erreur', 'Une erreur est survenue lors de l\'ajout de l\'événement.');
-      console.error(error);
+      Alert.alert('Erreur', `Une erreur est survenue`);
     }
   };
+  
 
-  // Fonction pour grouper les événements par mois
   const groupEventsByMonth = (events: Event[]) => {
     return events.reduce((acc, event) => {
       const month = dayjs(event.event_date).format('MMMM YYYY');
@@ -115,17 +113,16 @@ export default function EventListScreen() {
   const groupedEvents = groupEventsByMonth(events);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { width: screenWidth }]}>
       <Text style={styles.title}>Événements à venir</Text>
 
-      {/* Liste des événements */}
       <FlatList
         data={Object.keys(groupedEvents)}
         keyExtractor={(item) => item}
         renderItem={({ item: month }) => (
           <View style={styles.monthSection}>
             <Text style={styles.monthTitle}>{month}</Text>
-            {groupedEvents[month].map((event, index) => (
+            {groupedEvents[month].map((event) => (
               <View key={event.event_id} style={styles.eventItem}>
                 <View style={styles.eventHeader}>
                   <Text style={styles.eventName}>{event.event_name}</Text>
@@ -139,7 +136,6 @@ export default function EventListScreen() {
         ListEmptyComponent={<Text>Aucun événement à venir.</Text>}
       />
 
-      {/* Bouton pour ajouter un événement */}
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => setModalVisible(true)}
@@ -147,7 +143,6 @@ export default function EventListScreen() {
         <Text style={styles.addButtonText}>+</Text>
       </TouchableOpacity>
 
-      {/* Fenêtre modale pour ajouter un événement */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -191,13 +186,16 @@ export default function EventListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    justifyContent: 'flex-start',
     padding: 20,
+    backgroundColor: '#f5f5f5',
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    fontSize: 30,
+    fontWeight: 400,
     textAlign: 'center',
+    marginBottom: 30,
+    fontFamily: 'ADLaM Display',
   },
   monthSection: {
     marginBottom: 20,
@@ -207,8 +205,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#3498db',
     marginBottom: 10,
+    textAlign: 'center',
+    fontFamily: 'ADLaM Display',
   },
   eventItem: {
+    width: '100%',
     padding: 15,
     marginBottom: 10,
     backgroundColor: '#f9f9f9',
@@ -225,16 +226,19 @@ const styles = StyleSheet.create({
   eventName: {
     fontSize: 18,
     fontWeight: 'bold',
+    fontFamily: 'ADLaM Display',
   },
   eventDate: {
     fontSize: 16,
     color: '#555',
+    fontFamily: 'ADLaM Display',
   },
   eventType: {
     fontSize: 16,
     color: '#777',
     textAlign: 'center',
     marginTop: 10,
+    fontFamily: 'ADLaM Display',
   },
   addButton: {
     position: 'absolute',
@@ -255,6 +259,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 24,
     fontWeight: 'bold',
+    fontFamily: 'ADLaM Display',
   },
   modalContainer: {
     flex: 1,
@@ -263,7 +268,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    width: '80%',
+    width: '90%',
     backgroundColor: 'white',
     padding: 20,
     borderRadius: 10,
@@ -272,6 +277,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     marginBottom: 20,
     textAlign: 'center',
+    fontFamily: 'ADLaM Display',
   },
   input: {
     height: 40,
@@ -279,5 +285,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 20,
     paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: 'white',
+    fontFamily: 'ADLaM Display',
   },
 });

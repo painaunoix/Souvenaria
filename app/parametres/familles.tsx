@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Clipboard } from 'react-native';
-import * as Font from 'expo-font'; // Utilisé pour charger les polices
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Dimensions } from 'react-native';
+import * as Font from 'expo-font';
+import * as Clipboard from 'expo-clipboard';
 import { supabase } from '../../supabaseClient';
 import { useRouter } from 'expo-router';
 
@@ -78,36 +79,28 @@ export default function FamilleParametresScreen() {
     Alert.alert('Succès', 'ID de la famille copié dans le presse-papiers.');
   };
 
+  // Coller l'ID de la famille depuis le presse-papiers
+  const handlePasteFamilyId = async () => {
+    const clipboardContent = await Clipboard.getStringAsync();
+    setInputFamilyId(clipboardContent);
+  };
+
   // Rejoindre une famille
   const handleJoinFamily = async () => {
     if (inputFamilyId.trim() === '') {
       Alert.alert('Erreur', 'Veuillez entrer un ID de famille.');
       return;
     }
-  
+
     try {
-      // Récupérer le username de l'utilisateur connecté depuis `user_profiles`
-      const { data: profileData, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('username')
-        .eq('id', userId) // On utilise l'user_id pour récupérer le profil correspondant
-        .single();
-  
-      if (profileError) {
-        throw profileError;
-      }
-  
-      const username = profileData.username;
-  
-      // Ajouter une demande dans `family_requests` avec l'user_id, family_id, et username
       const { error: requestError } = await supabase
         .from('family_requests')
-        .insert([{ user_id: userId, family_id: inputFamilyId }]); // On insère uniquement user_id et family_id
-  
+        .insert([{ user_id: userId, family_id: inputFamilyId }]);
+
       if (requestError) {
         throw requestError;
       }
-  
+
       Alert.alert('Succès', 'Votre demande a été envoyée avec succès!');
       setInputFamilyId('');
     } catch (error) {
@@ -120,8 +113,11 @@ export default function FamilleParametresScreen() {
     return <Text>Chargement des polices...</Text>;
   }
 
+  // Récupérer les dimensions de l'écran pour adapter le design
+  const { width, height } = Dimensions.get('window');
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { width, height }]}>
       <Text style={styles.title}>Paramètres de la famille</Text>
 
       <Text style={styles.sectionTitle}>Créer une famille</Text>
@@ -132,6 +128,7 @@ export default function FamilleParametresScreen() {
       <TextInput
         style={styles.input}
         placeholder="Nom de la famille"
+        placeholderTextColor="#666"
         value={familyName}
         onChangeText={setFamilyName}
       />
@@ -145,12 +142,14 @@ export default function FamilleParametresScreen() {
           <View style={styles.underlineContainer}>
             <View style={styles.underline} />
           </View>
-          <View style={styles.copyRow}>
-            <Text style={styles.familyId}>{familyId}</Text>
-            <TouchableOpacity style={styles.copyButton} onPress={handleCopyFamilyId}>
-              <Text style={styles.copyButtonText}>Copier l'ID</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.familyId}>{familyId}</Text>
+          <TouchableOpacity style={styles.copyButton} onPress={handleCopyFamilyId}>
+            <Text style={styles.copyButtonText}>Copier l'ID</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.button} onPress={() => router.push('./membres')}>
+            <Text style={styles.buttonText}>Voir les membres de la famille</Text>
+          </TouchableOpacity>
         </>
       ) : (
         <Text style={styles.sectionTitle}>Vous n'êtes pas associé à une famille.</Text>
@@ -164,9 +163,13 @@ export default function FamilleParametresScreen() {
       <TextInput
         style={styles.input}
         placeholder="Entrer un ID de famille pour rejoindre"
+        placeholderTextColor="#666"
         value={inputFamilyId}
         onChangeText={setInputFamilyId}
       />
+      <TouchableOpacity style={styles.copyButton} onPress={handlePasteFamilyId}>
+        <Text style={styles.copyButtonText}>Coller l'ID</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={handleJoinFamily}>
         <Text style={styles.buttonText}>Rejoindre la famille</Text>
       </TouchableOpacity>
@@ -186,14 +189,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   title: {
-    fontSize: 36,
+    fontSize: 30,
     fontWeight: 400,
     textAlign: 'center',
     marginBottom: 30,
     fontFamily: 'ADLaM Display',
   },
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 300,
     textAlign: 'center',
     marginBottom: 10,
@@ -220,38 +223,46 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: '#007bff',
     borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    marginBottom: 30,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignSelf: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.7,
+    shadowRadius: 4,
+    elevation: 5,
   },
   buttonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: 300,
     fontFamily: 'ADLaM Display',
-  },
-  copyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
   },
   familyId: {
     fontSize: 16,
     fontWeight: 200,
+    textAlign: 'center',
     fontFamily: 'ADLaM Display',
+    marginBottom: 10,
   },
   copyButton: {
     backgroundColor: '#28a745',
-    borderRadius: 10,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignSelf: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.7,
+    shadowRadius: 4,
+    elevation: 5,
   },
   copyButtonText: {
     color: 'white',
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: 300,
     fontFamily: 'ADLaM Display',
   },
 });

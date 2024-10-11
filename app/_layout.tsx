@@ -20,7 +20,7 @@ export default function Layout() {
         setIsLoggedIn(false);
       }
     };
-    router.replace('/register');
+    router.replace('/login');
     checkUserSession();
   }, []);
 
@@ -80,20 +80,34 @@ export default function Layout() {
     '/parametres',
     '/parametres/familles',
     '/parametres/profils',
+    '/parametres/membres',
     '/parametres/demandes',
+    '/parametres/edit_profile',
   ];
 
   const shouldShowMenu = pagesWithMenu.includes(pathname);
   const isSubPage = pathname.includes('/parametres/familles') || pathname.includes('/parametres/profils');
-  const isDemandesPage = pathname.includes('/parametres/demandes');
+  const isDemandesPage = pathname.includes('/parametres/demandes') || pathname.includes('/parametres/membres');
+  const isEditPage = pathname.includes('/parametres/edit_profil');
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
       {shouldShowMenu && (
         <View style={styles.header}>
-          {isSubPage || isDemandesPage ? (
+          {isSubPage || isDemandesPage || isEditPage ? (
             <TouchableOpacity 
-              onPress={() => isDemandesPage ? router.push('/parametres/familles') : router.push('/parametres')} 
+              onPress={() => {
+                if (isEditPage) {
+                  // Si sur page d'édition de profil, retour à la page de profil
+                  router.push('/parametres/profils');
+                } else if (isDemandesPage) {
+                  // Si sur la page des demandes, retour à la page des familles
+                  router.push('/parametres/familles');
+                } else {
+                  // Sinon, retour aux paramètres
+                  router.push('/parametres');
+                }
+              }} 
               style={styles.backButton}
             >
               <Ionicons name="arrow-back" size={30} color="black" />
